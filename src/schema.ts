@@ -1,10 +1,9 @@
-
 export default {
   type: 'object',
-  additionalProperties: false,
+  additionalProperties: true,
   properties: {
     entry: {
-      type: 'object'
+      type: 'object',
     },
     htmlName: {
       type: 'string',
@@ -14,10 +13,7 @@ export default {
       type: 'boolean',
     },
     splitChunks: {
-      anyOf: [
-        { type: 'boolean' },
-        { type: 'object' },
-      ],
+      anyOf: [{ type: 'boolean' }, { type: 'object' }],
     },
     html: {
       type: 'object',
@@ -25,15 +21,12 @@ export default {
         template: {
           type: 'string',
           minLength: 1,
-          pattern: '.ejs$',
+          pattern: '.pug$',
         },
       },
     },
     selectEntry: {
-      anyOf: [
-        { type: 'boolean' },
-        { type: 'object' },
-      ],
+      anyOf: [{ type: 'boolean' }, { type: 'object' }],
     },
   },
 };

@@ -1,6 +1,6 @@
 {
-  "name": "umi-plugin-mpa",
-  "version": "2.0.0",
+  "name": "umi-plugin-mpa-pug",
+  "version": "0.1.0",
   "description": "MPA(multiple-page application) plugin for umi.",
   "repository": "umijs/umi-plugin-mpa",
   "main": "dist/index.js",
@@ -25,10 +25,14 @@
   "dependencies": {
     "ajv": "^6.9.1",
     "deasync-promise": "^1.0.1",
+    "html-loader": "^0.5.5",
     "html-webpack-plugin": "^3.2.0",
     "inquirer": "^6.2.1",
     "lodash": "^4.17.11",
-    "semver": "^5.6.0"
+    "pug": "^2.0.4",
+    "pug-loader": "^2.4.0",
+    "semver": "^5.6.0",
+    "umi-plugin-types": "^0.3.2"
   },
   "devDependencies": {
     "@types/jest": "^24.0.3",
