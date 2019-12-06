@@ -21,7 +21,7 @@ interface IOption {
   splitChunks?: object | boolean;
   html?: {
     template?: string;
-    chunks?: any[];
+    commonChunks?: any[];
   };
   selectEntry?: boolean | object;
   injectCheck?: Function; // html 和 js 的匹配规则
@@ -29,10 +29,6 @@ interface IOption {
 
 interface IEntry {
   [name: string]: string | string[];
-}
-
-interface IEntryConfig {
-  context?: object;
 }
 
 function getFiles(absPath: string, path: string, files: string[]) {
@@ -144,7 +140,12 @@ ${errors.join('\n')}
       : readdirSync(paths.absPagesPath);
 
     const htmlEntrys = getEntrys(paths.absPagesPath, allFiles, /\.(html|pug)$/);
-    let jsxEntrys = getEntrys(paths.absPagesPath, allFiles, /\.(j|t)sx?$/);
+    let jsxEntrys = getEntrys(paths.absPagesPath, allFiles, /\.(j|t)sx$/);
+
+    // 打包公共模块
+    if (options.html.commonChunks) {
+      jsxEntrys = { ...options.html.commonChunks, ...jsxEntrys };
+    }
 
     // 如果未设置 entry，则自动匹配 pages 下的js 文件
     if (!options.entry) {
@@ -221,8 +222,8 @@ ${errors.join('\n')}
           config.chunks.push('vendors');
         }
         // 注入公共库
-        if (options.html.chunks) {
-          for (let chunk in options.html.chunks) {
+        if (options.html.commonChunks) {
+          for (let chunk in options.html.commonChunks) {
             config.chunks.push(chunk);
           }
         }
