@@ -2,11 +2,11 @@
   "name": "umi-plugin-mpa-pug",
   "version": "0.1.0",
   "description": "MPA(multiple-page application) plugin for umi.",
-  "repository": "umijs/umi-plugin-mpa",
+  "repository": "wealthworks-fe/umi-plugin-mpa-pug",
   "main": "dist/index.js",
   "author": {
-    "name": "chencheng",
-    "email": "sorrycc@gmail.com"
+    "name": "zhongxia",
+    "email": "izhongxia@sina.com"
   },
   "engines": {
     "node": ">=8.0.0"

@@ -1,37 +1,23 @@
-# umi-plugin-mpa
+# umi-plugin-mpa-pug
 
-MPA(multiple-page application) plugin for umi.
+该插件 Fork [umi-plugin-mpa](https://github.com/umijs/umi-plugin-mpa) 仓库，做了一下几点的修改，以便无缝迁移项目用。
 
-[![NPM version](https://img.shields.io/npm/v/umi-plugin-mpa.svg?style=flat)](https://npmjs.org/package/umi-plugin-mpa)
-[![Build Status](https://img.shields.io/travis/umijs/umi-plugin-mpa.svg?style=flat)](https://travis-ci.org/umijs/umi-plugin-mpa)
-[![NPM downloads](http://img.shields.io/npm/dm/umi-plugin-mpa.svg?style=flat)](https://npmjs.org/package/umi-plugin-mpa)
+- ✔︎ ejs 模板改成 pug 模板
+- ✔︎ 去掉默认模板的功能
+- ✔︎ 支持只有 html 文件，没有 js 文件，生成页面
 
 ## Why
 
-有一些基于 [atool-build](https://github.com/ant-tool/atool-build) 或者 [roadhog](https://github.com/sorrycc/roadhog) 的老业务，是传统的 MPA（多页应用），并且他们是真的多页，因为每个页面之间的关系不大，强行套 SPA（单页应用）的模式意义并不大，反而多了一些冗余的代码，比如路由。
+1. ejs 不支持模板继承的功能，因此替换成功能更强的 pug 模板
 
-另外，atool-build 已停止维护。
+   > 使用场景：react 页面，在加载 JS 的时候，增加一个 Loading 效果
 
-所以，为了让这些老业务能更容易地升级上来，享受新的技术栈，我们提供了 umi-plugin-mpa 来支持多页应用，把 umi 单纯作为 webpack 封装工具来使用。同时，umi 的部分功能会不可用，比如路由、global.js、global.css、app.js 等。
-
-## Features
-
-- ✔︎ 禁用 umi 内置的 HTML 生成
-- ✔︎ 禁用 umi 内置的路由功能
-- ✔︎ 禁用 umi 默认生成的 entry 配置
-- ✔︎ 支持通过 targets 配置的补丁方案，配 `BABEL_POLYFILL=none` 则不打补丁
-- ✔︎ 支持多级目录自动查找 `src/pages` 下的 js 文件为 entry
-- ✔︎ import 的 html 文件会被生成到 dist 目录下
-- ✔︎ Hot Module Replacement
-- ✔︎ 通过 `splitChunks` 配置提取公共部分
-- ✔︎ 通过 `html` 配置根据入口文件自动生成 html
-- ✔︎ 通过 `selectEntry` 配置选择部分 entry 以提升调试效率
-- ✔︎ 支持查看 entry 列表，默认是 `index.html`，冲突时切换为 `__index.html`
+2. 为了支持一些简单的页面，只有 html，没有 js。 因此生成的页面，是遍历 pug/html 列表生成，而不是遍历 entry 入口生成。
 
 ## Installation
 
 ```bash
-$ yarn add umi-plugin-mpa
+$ yarn add umi-plugin-mpa-pug
 ```
 
 ## Usage
@@ -40,7 +26,7 @@ Config it in `.umirc.js` or `config/config.js`,
 
 ```js
 export default {
-  plugins: ['umi-plugin-mpa'],
+  plugins: ['umi-plugin-mpa-pug'],
 };
 ```
 
@@ -48,13 +34,107 @@ with options,
 
 ```js
 export default {
-  plugins: [['umi-plugin-mpa', options]],
+  plugins: [['umi-plugin-mpa-pug', options]],
 };
 ```
 
+## Features
+
+1. 约定 index.jsx 文件，会作为 webpack 入口文件被打包，避免把组件也打包出一个 js 文件
+
+2. 支持给每个页面注入公共代码
+
+   > 比如数据打点，错误统计，一些所有页面都需要的通用逻辑，比如再微信内，都默认静默授权
+
+3. 自定义 JS 文件注入到 HTML 中的规则
+
+   > 默认是 **同一目录下，同名文件则注入**
+   >
+   > 只是在自定义注入方法
+
+   ```js
+   {
+     html: {},
+     // 返回 html 和 js 的路径
+     injectCheck:(html,js)=>{
+       return html === js  // 默认 同一目录，同名文件
+     }
+   }
+
+   ```
+
+4. 给所有页面增加公共代码
+
+   ```js
+   {
+     html: {
+       commonChunks:{
+           'common/base': path.resolve(__dirname,'./common/base.js')
+       }
+     },
+   }
+   ```
+
+> 最终效果，类似这样
+>
+> ![](https://guihua-static.licaigc.com/2019-12-11-073722.png)
+
 ## Options
 
-### entry
+> 不建议使用的 Options 项，是因为该插件还没有去适配这块的内容，不知道是否可行。如果非要使用的话，建议先使用 [umi-plugin-mpa]
+
+### pagesPath
+
+页面代码的路径，如果配置，则会从该目录去自动寻找 jsx 文件为 entry 入口，并找到目录下所有 pug /html 生成 html 文件。
+
+- Type : `string`
+- Default : `pages`
+
+> 默认会寻找 pages 目录下的所有 jsx /tsx 文件，作为 entry 入口
+
+### html
+
+配置给 [html-webpack-plugin](https://github.com/jantimon/html-webpack-plugin) 的配置，用于为每个 entry 自动生成 html 文件。
+
+- Type: `Object`
+- Default: `null`
+
+如有配置，则会基于以下默认值进行覆盖，
+
+```js
+{
+  template,
+  filename: `${page}.html`,
+  chunks: [page]
+}
+```
+
+其中，
+
+- 如果有一个和 entry 文件同目录同文件名但后缀为 `.pug` 的文件，则会用次文件作为其 template，且优先级最高
+- entry 和 pug 模板匹配的规则可以通过 `injectCheck` 函数来判断，如果匹配上，则会把 entry 生成的 js 文件注入到 pug 中
+
+更多配置方式，详见 https://github.com/jantimon/html-webpack-plugin#options 。
+
+### injectCheck
+
+entry 注入到 pug /html 文件的规则
+
+- Type：Function
+- Default ：((_html_, _js_) _=>_ html === js)
+
+html，js 表示 分别得路径和文件名（不包含后缀）
+
+### deepPageEntry
+
+在自动查找 `src/pages` 下的 js 或 ts 文件为 entry 时，是否进入子目录查找
+
+- Type: `Boolean`
+- Default: `false`
+
+注：会跳过以 `__` 或 `.` 开头的目录
+
+### entry【暂建议默认】
 
 指定 webpack 的 [entry](https://webpack.js.org/configuration/entry-context/#entry) 。
 
@@ -93,7 +173,7 @@ entry 的额外配置项目前支持：
 <title><%= htmlWebpackPlugin.options.title %></title>
 ```
 
-### htmlName
+### htmlName [暂建议默认]
 
 指定 import 生成的 html 文件的文件名。
 
@@ -102,16 +182,7 @@ entry 的额外配置项目前支持：
 
 可以用 `[name]`、`[path]`、`[hash]` 和 `[ext]`，详见 https://github.com/webpack-contrib/file-loader 。
 
-### deepPageEntry
-
-在自动查找 `src/pages` 下的 js 或 ts 文件为 entry 时，是否进入子目录查找
-
-- Type: `Boolean`
-- Default: `false`
-
-注：会跳过以 `__` 或 `.` 开头的目录
-
-### splitChunks
+### splitChunks [暂建议默认]
 
 配置 webpack 的 splitChunks，用于提取 common 或 vendors 等。
 
@@ -140,32 +211,7 @@ entry 的额外配置项目前支持：
 }
 ```
 
-### html
-
-配置给 [html-webpack-plugin](https://github.com/jantimon/html-webpack-plugin) 的配置，用于为每个 entry 自动生成 html 文件。
-
-- Type: `Object`
-- Default: `null`
-
-如有配置，则会基于以下默认值进行覆盖，
-
-```js
-{
-  template,
-  filename: `${page}.html`,
-  chunks: [page]
-}
-```
-
-其中，
-
-- template 有一个[默认模板](http://github.com/umijs/umi-plugin-mpa/tree/master/templates/document.ejs)，可通过配置进行覆盖
-- 如果有一个和 entry 文件同目录同文件名但后缀为 `.ejs` 的文件，则会用次文件作为其 template，且优先级最高
-- chunks 有一个特殊项为 `<%= page %>`，如果配置了，会被替换为当前 page 名
-
-更多配置方式，详见 https://github.com/jantimon/html-webpack-plugin#options 。
-
-### selectEntry
+### selectEntry [暂建议默认]
 
 是否开启 entry 选择，以提升开发效率。
 
@@ -177,11 +223,3 @@ entry 的额外配置项目前支持：
 1. 值为 Object 时会用于覆盖默认的 inquirer 配置，详见https://github.com/SBoudrias/Inquirer.js#question
 2. 适用于 entry 量大的项目，只在 dev 时开启
 3. 由于使用了 deasync-promise，所以在入口选择界面上按 Ctrl+C 退出会失败，且进程清理不干净。这时需手动强制退出相关 node 进程。
-
-## Questions & Suggestions
-
-Please open an issue [here](https://github.com/umijs/umi/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc).
-
-## LICENSE
-
-MIT

@@ -25,6 +25,7 @@ interface IOption {
   };
   selectEntry?: boolean | object;
   injectCheck?: Function; // html 和 js 的匹配规则
+  pagesPath?: string; // 页面代码目录
 }
 
 interface IEntry {
@@ -132,15 +133,18 @@ ${errors.join('\n')}
     // set entry
     const hmrScript = webpackConfig.entry['umi'][0];
 
+    let pagesPath = paths.absPagesPath;
+    if (options.pagesPath) {
+      pagesPath = `${paths.absSrcPath}${options.pagesPath}`;
+    }
+
     // 是否进入子目录生成路由
     const allFiles: string[] = options.deepPageEntry
-      ? flattenDeep(
-          getFiles(paths.absPagesPath, '', readdirSync(paths.absPagesPath)),
-        )
-      : readdirSync(paths.absPagesPath);
+      ? flattenDeep(getFiles(pagesPath, '', readdirSync(pagesPath)))
+      : readdirSync(pagesPath);
 
-    const htmlEntrys = getEntrys(paths.absPagesPath, allFiles, /\.(html|pug)$/);
-    let jsxEntrys = getEntrys(paths.absPagesPath, allFiles, /\.(j|t)sx$/);
+    const htmlEntrys = getEntrys(pagesPath, allFiles, /\.(html|pug)$/);
+    let jsxEntrys = getEntrys(pagesPath, allFiles, /\.(j|t)sx$/);
 
     // 打包公共模块
     if (options.html.commonChunks) {
