@@ -14,6 +14,10 @@
 
 2. 为了支持一些简单的页面，只有 html，没有 js。 因此生成的页面，是遍历 pug/html 列表生成，而不是遍历 entry 入口生成。
 
+3. mpa 页面不支持 umi-plugin-react 的 fastclick 功能
+
+   > 因为 fastclick 是放在 umi.js 下，单页面并不会去引用打包该文件，因此 fastclick 就算是开启了，也没用引入到文件中。
+
 ## Installation
 
 ```bash
