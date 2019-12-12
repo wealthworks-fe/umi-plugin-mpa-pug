@@ -171,8 +171,18 @@ ${errors.join('\n')}
       ? flattenDeep(getFiles(pagesPath, '', readdirSync(pagesPath)))
       : readdirSync(pagesPath);
 
-    const htmlEntrys = getEntrys(pagesPath, allFiles, /\.(html|pug)$/);
-    let jsxEntrys = getEntrys(pagesPath, allFiles, /\.(j|t)sx$/);
+    const htmlEntrys = getEntrys(
+      pagesPath,
+      allFiles,
+      /\.(html|pug)$/,
+      options.prefixPath,
+    );
+    let jsxEntrys = getEntrys(
+      pagesPath,
+      allFiles,
+      /\.(j|t)sx$/,
+      options.prefixPath,
+    );
     const toolsEntry = {
       [`${options.prefixPath}tools`]: require.resolve(
         '../templates/tools/index.js',
