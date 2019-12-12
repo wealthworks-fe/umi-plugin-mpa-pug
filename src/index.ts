@@ -1,7 +1,8 @@
 import { IApi } from 'umi-plugin-types';
-import { existsSync, readdirSync, lstatSync } from 'fs';
-import { join, extname, basename, dirname } from 'path';
+import { readdirSync, lstatSync } from 'fs';
+import { join, extname, basename } from 'path';
 import { cloneDeep, isPlainObject, flattenDeep } from 'lodash';
+import px2rem from 'postcss-plugin-px2rem';
 // 验证 JSON 结构和数据类型是否符合约定的规范
 import AJV from 'ajv';
 import schema from './schema';
@@ -15,29 +16,50 @@ const inquirer = require('inquirer');
 const semver = require('semver');
 
 interface IOption {
-  entry?: object;
-  htmlName?: string;
+  // 页面前缀 www.xxx.com/{prefixPath}/index.html , 作用：微前端，方便项目做 nginx 代理
+  // 比如：/m/ 开头的代理 指定前端项目中
+  prefixPath?: string;
+  fastclick?: boolean; //暂未使用该变量，统一加入
+  debugTool?: boolean; //暂未使用该变量，统一加入
   deepPageEntry?: boolean;
   splitChunks?: object | boolean;
-  html?: {
-    template?: string;
-    commonChunks?: any[];
-  };
-  selectEntry?: boolean | object;
   injectCheck?: Function; // html 和 js 的匹配规则
   pagesPath?: string; // 页面代码目录
+  commonChunks?: IEntry[]; // 公共代码包
+  selectEntry?: boolean | object;
+  entry?: object;
+  px2rem?: {
+    rootValue: number | string;
+  };
+  html?: {
+    template?: string;
+  };
 }
 
 interface IEntry {
   [name: string]: string | string[];
 }
 
-function getFiles(absPath: string, path: string, files: string[]) {
+// 默认的插件配置
+const DEFAULT_OPTIONS: IOption = {
+  pagesPath: '',
+  prefixPath: '',
+  debugTool: true,
+  fastclick: true,
+  deepPageEntry: true,
+  splitChunks: true,
+  px2rem: {
+    rootValue: 16,
+  },
+  injectCheck: (html, js) => html === js, // 默认js会注入到同一目录下，同名的 pug/html 文件内
+};
+
+function getFiles(basePath: string, path: string, files: string[]) {
   return files.map(f => {
-    const lstat = lstatSync(join(absPath, path, f));
+    const lstat = lstatSync(join(basePath, path, f));
     if (f.charAt(0) !== '.' && !f.startsWith('__') && lstat.isDirectory()) {
-      const subDirFiles = readdirSync(join(absPath, path, f));
-      return getFiles(absPath, join(path, f), subDirFiles);
+      const subDirFiles = readdirSync(join(basePath, path, f));
+      return getFiles(basePath, join(path, f), subDirFiles);
     } else {
       return join(path, f);
     }
@@ -46,11 +68,17 @@ function getFiles(absPath: string, path: string, files: string[]) {
 
 /**
  * 从文件列表中，找出指定正则的文件，并处理成对象 entry 的形式
- * @param {string} absPagesPath
+ * @param {string} pagesPath
  * @param {string[]} 文件列表 [dmeo.pug','demo.js','index.js','index.pug']
  * @param {RegExp} regex 匹配文件后缀的正则
+ * @param {string} prefixPath 打包资源的路径前缀
  */
-function getEntrys(absPagesPath: string, allFiles: string[], regex: RegExp) {
+function getEntrys(
+  pagesPath: string,
+  allFiles: string[],
+  regex: RegExp,
+  prefixPath: string = '',
+) {
   return allFiles
     .filter(
       f => basename(f).charAt(0) !== '.' && regex.test(extname(f)), // 过滤出指定正则的文件的文件
@@ -64,7 +92,7 @@ function getEntrys(absPagesPath: string, allFiles: string[], regex: RegExp) {
        * }
        */
       const name = f.replace(regex, '');
-      memo[name] = [join(absPagesPath, f)];
+      memo[`${prefixPath}${name}`] = [join(pagesPath, f)];
       return memo;
     }, {});
 }
@@ -72,15 +100,12 @@ function getEntrys(absPagesPath: string, allFiles: string[], regex: RegExp) {
 export default function(api: IApi, options = {} as IOption) {
   const { log, paths } = api;
 
-  // TODO: umi 版本判断, 这个需要了解下为什么需要这个版本判断
+  // 如果 umi 升级到3.x，需要来校验一下，看是否兼容
   const umiVersion = process.env.UMI_VERSION;
   assert(
     semver.gte(umiVersion, '2.4.3') && semver.lt(umiVersion, '3.0.0'),
     `Your umi version is ${umiVersion}, >=2.4.3 and <3 is required.`,
   );
-
-  // 默认js会注入到同一目录下，同名的 pug/html 文件内
-  options.injectCheck = options.injectCheck || ((html, js) => html === js);
 
   // validate options with ajv
   // TODO:需要对所有属性进行校验，目前允许附加的属性
@@ -123,6 +148,8 @@ ${errors.join('\n')}
 
   const isDev = process.env.NODE_ENV === 'development';
 
+  options = { ...DEFAULT_OPTIONS, ...options };
+
   // 提供一个假的 routes 配置，这样就不会走约定式路由，解析 src/pages 目录
   // https://umijs.org/zh/config/#routes
   api.modifyDefaultConfig(memo => {
@@ -133,6 +160,7 @@ ${errors.join('\n')}
     // set entry
     const hmrScript = webpackConfig.entry['umi'][0];
 
+    // 默认使用 pages 目录
     let pagesPath = paths.absPagesPath;
     if (options.pagesPath) {
       pagesPath = `${paths.absSrcPath}${options.pagesPath}`;
@@ -145,17 +173,24 @@ ${errors.join('\n')}
 
     const htmlEntrys = getEntrys(pagesPath, allFiles, /\.(html|pug)$/);
     let jsxEntrys = getEntrys(pagesPath, allFiles, /\.(j|t)sx$/);
+    const toolsEntry = {
+      [`${options.prefixPath}tools`]: require.resolve(
+        '../templates/tools/index.js',
+      ),
+    };
+
+    // 注入工具包
+    jsxEntrys = { ...toolsEntry, ...jsxEntrys };
 
     // 打包公共模块
-    if (options.html.commonChunks) {
-      jsxEntrys = { ...options.html.commonChunks, ...jsxEntrys };
+    if (options.commonChunks) {
+      jsxEntrys = { ...options.commonChunks, ...jsxEntrys };
     }
 
     // 如果未设置 entry，则自动匹配 pages 下的js 文件
     if (!options.entry) {
-      // find entry from pages directory
       log.info(
-        `[umi-plugin-mpa-pug] options.entry is null, find files in pages for entry`,
+        `[umi-plugin-mpa-pug] options.entry is null, find files in ${pagesPath} for entry`,
       );
       webpackConfig.entry = jsxEntrys;
     } else {
@@ -163,7 +198,6 @@ ${errors.join('\n')}
     }
 
     // 支持选择部分 entry 以提升开发效率
-    // TODO:先不考虑，还是继续按照jsx 的路径来, 后续改成用 pug 的路径来
     if (isDev && options.selectEntry) {
       const keys = Object.keys(webpackConfig.entry);
       if (keys.length > 1) {
@@ -214,36 +248,40 @@ ${errors.join('\n')}
     // 遍历 html列表，生成 HTMLWebpackPlugin 插件配置
     Object.keys(htmlEntrys).forEach(key => {
       // html-webpack-plugin
-      if (options.html) {
-        const config = {
-          template: htmlEntrys[key][0],
-          filename: `${key}.html`,
-          chunks: [],
-          ...cloneDeep(options.html),
-        };
+      const config = {
+        template: htmlEntrys[key][0],
+        filename: `${key}.html`,
+        chunksSortMode: 'manual',
+        minify: {
+          removeComments: true,
+          collapseWhitespace: false,
+        },
+        chunks: [`${options.prefixPath}tools`],
+        ...cloneDeep(options.html),
+      };
 
-        if (options.splitChunks === true) {
-          config.chunks.push('vendors');
-        }
-        // 注入公共库
-        if (options.html.commonChunks) {
-          for (let chunk in options.html.commonChunks) {
-            config.chunks.push(chunk);
-          }
-        }
-        // 遍历判断注入;
-        for (let jsEntry in jsxEntrys) {
-          if (options.injectCheck(key, jsEntry)) {
-            config.chunks.push(jsEntry);
-          }
-        }
-
-        webpackConfig.plugins.push(new HTMLWebpackPlugin(config));
+      if (options.splitChunks === true) {
+        // 使用默认的抽离公共包方式，并把该包注入到 html文件中
+        config.chunks.push(`${options.prefixPath}vendors`);
       }
+      // 注入公共库
+      if (options.commonChunks) {
+        for (let chunk in options.commonChunks) {
+          config.chunks.push(chunk);
+        }
+      }
+      // 遍历判断注入;
+      for (let jsEntry in jsxEntrys) {
+        if (options.injectCheck(key, jsEntry)) {
+          config.chunks.push(jsEntry);
+        }
+      }
+
+      webpackConfig.plugins.push(new HTMLWebpackPlugin(config));
     });
 
     // 开发环境，如果没有找到 index.html ，则展示 __index.html(页面列表清单) 当首页
-    if (isDev && options.html) {
+    if (isDev) {
       let filename = 'index.html';
       if (Object.keys(webpackConfig.entry).includes('index')) {
         filename = '__index.html';
@@ -286,7 +324,7 @@ ${errors.join('\n')}
       .use('html-loader')
       .loader('html-loader')
       .options({
-        name: options.htmlName || '[name].[ext]',
+        name: '[name].[ext]',
       });
 
     // ejs模板不能继承
@@ -297,7 +335,7 @@ ${errors.join('\n')}
       .use('pug-loader')
       .loader('pug-loader')
       .options({
-        name: options.htmlName || '[name].html',
+        name: '[name].html',
       });
 
     const { config } = api;
@@ -310,9 +348,13 @@ ${errors.join('\n')}
         isPlainObject(options.splitChunks)
           ? options.splitChunks
           : {
-              chunks: 'all',
-              name: 'vendors',
-              minChunks: 2,
+              cacheGroups: {
+                vendors: {
+                  test: /(react|react-dom|core-js|regenerator-runtime)/,
+                  name: `${options.prefixPath}vendors`,
+                  chunks: 'all',
+                },
+              },
             },
       );
     }
@@ -324,6 +366,18 @@ ${errors.join('\n')}
       /\.html?$/,
       /\.pug?$/,
     ];
+
+    // 增加 px 自动转 rem
+    if (options.px2rem) {
+      opts.extraPostCSSPlugins = [
+        ...(opts.extraPostCSSPlugins || []),
+        px2rem({
+          rootValue: 16,
+          ...(options.px2rem || {}),
+        }),
+      ];
+    }
+
     return opts;
   });
 }

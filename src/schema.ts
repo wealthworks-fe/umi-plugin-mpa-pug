@@ -5,10 +5,6 @@ export default {
     entry: {
       type: 'object',
     },
-    htmlName: {
-      type: 'string',
-      minLength: 1,
-    },
     deepPageEntry: {
       type: 'boolean',
     },

@@ -12,14 +12,6 @@ describe('schema', () => {
     ).toEqual(true);
   });
 
-  it('htmlName', () => {
-    expect(
-      ajv.validate(schema, {
-        htmlName: 'foo',
-      }),
-    ).toEqual(true);
-  });
-
   it('deepPageEntry', () => {
     expect(
       ajv.validate(schema, {

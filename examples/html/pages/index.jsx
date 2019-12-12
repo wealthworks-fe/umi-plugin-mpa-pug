@@ -8,4 +8,4 @@ function App() {
   );
 }
 
-require('react-dom').render(<App />, document.getElementById('root'));
+require('react-dom').render(<App />, document.getElementById('app'));

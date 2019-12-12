@@ -2,9 +2,15 @@
 
 该插件 Fork [umi-plugin-mpa](https://github.com/umijs/umi-plugin-mpa) 仓库，做了一下几点的修改，以便无缝迁移项目用。
 
-- ✔︎ ejs 模板改成 pug 模板
-- ✔︎ 去掉默认模板的功能
+[![NPM version](https://img.shields.io/npm/v/umi-plugin-mpa-pug.svg?style=flat)](https://npmjs.org/package/umi-plugin-mpa-pug)
+[![Build Status](https://img.shields.io/travis/umijs/umi-plugin-mpa-pug.svg?style=flat)](https://travis-ci.org/umijs/umi-plugin-mpa-pug)
+[![NPM downloads](http://img.shields.io/npm/dm/umi-plugin-mpa-pug.svg?style=flat)](https://npmjs.org/package/umi-plugin-mpa-pug)
+
+- ✔︎ 支持 pug 模板，html 模板
 - ✔︎ 支持只有 html 文件，没有 js 文件，生成页面
+- ✔︎ 自动识别 jsx 文件作为 entry 入口，识别 pug/html 文件，生成 html 文件 (jsx 如果必须注入到 html 中，才有用，不会自动生成 html)
+- ✔︎ 多页面中 umi-plugin-react 的 fastclick , hd 不起作用，因此该插件支持 fastclick，px2rem 功能
+- ✔︎ 支持添加页面前缀路径，方便多个前端整个做 nginx 代理
 
 ## Why
 
@@ -87,140 +93,29 @@ export default {
 
 > 不建议使用的 Options 项，是因为该插件还没有去适配这块的内容，不知道是否可行。如果非要使用的话，建议先使用 [umi-plugin-mpa]
 
-### pagesPath
-
-页面代码的路径，如果配置，则会从该目录去自动寻找 jsx 文件为 entry 入口，并找到目录下所有 pug /html 生成 html 文件。
-
-- Type : `string`
-- Default : `pages`
-
-> 默认会寻找 pages 目录下的所有 jsx /tsx 文件，作为 entry 入口
-
-### html
-
-配置给 [html-webpack-plugin](https://github.com/jantimon/html-webpack-plugin) 的配置，用于为每个 entry 自动生成 html 文件。
-
-- Type: `Object`
-- Default: `null`
-
-如有配置，则会基于以下默认值进行覆盖，
-
 ```js
-{
-  template,
-  filename: `${page}.html`,
-  chunks: [page]
+interface IOption {
+  // 页面前缀 www.xxx.com/{prefixPath}/index.html , 作用：微前端，方便项目做 nginx 代理
+  // 比如：/m/ 开头的代理 指定前端项目中
+  prefixPath?: string;
+  fastclick?: boolean; //暂未使用该变量，统一加入
+  debugTool?: boolean; //暂未使用该变量，统一加入
+  deepPageEntry?: boolean; // 遍历子文件夹寻找jsx，pug 文件
+  splitChunks?: object | boolean; // 抽离公共代码包
+  injectCheck?: Function; // html 和 js 的匹配规则
+  pagesPath?: string; // 页面代码目录
+  commonChunks?: IEntry[]; // 公共代码包
+  selectEntry?: boolean | object; // 开发环境，可打包指定页面
+  entry?: object; // 自定义入口，暂时用不到
+  px2rem?: {
+    rootValue: number | string, // 默认16px
+  };
+  html?: {
+    // 扩展html-wepback-plugin 参数
+    template?: string,
+  };
 }
 ```
-
-其中，
-
-- 如果有一个和 entry 文件同目录同文件名但后缀为 `.pug` 的文件，则会用次文件作为其 template，且优先级最高
-- entry 和 pug 模板匹配的规则可以通过 `injectCheck` 函数来判断，如果匹配上，则会把 entry 生成的 js 文件注入到 pug 中
-
-更多配置方式，详见 https://github.com/jantimon/html-webpack-plugin#options 。
-
-### injectCheck
-
-entry 注入到 pug /html 文件的规则
-
-- Type：Function
-- Default ：((_html_, _js_) _=>_ html === js)
-
-html，js 表示 分别得路径和文件名（不包含后缀）
-
-### deepPageEntry
-
-在自动查找 `src/pages` 下的 js 或 ts 文件为 entry 时，是否进入子目录查找
-
-- Type: `Boolean`
-- Default: `false`
-
-注：会跳过以 `__` 或 `.` 开头的目录
-
-### entry【暂建议默认】
-
-指定 webpack 的 [entry](https://webpack.js.org/configuration/entry-context/#entry) 。
-
-- Type: `Object`
-- Default: `null`
-
-如果没有设置 entry，会自动查找 `src/pages` 下的 js 或 ts 文件为 entry 。
-
-entry 项的值如果是数组且最后一个是对象时，会作为此 entry 的额外配置项。
-
-entry 的额外配置项目前支持：
-
-#### context
-
-如果有配 `html` 时会作为 html 的模板内容。
-
-比如：
-
-```js
-{
-  entry: {
-    foo: [
-      './src/foo.js',
-      {
-        context: { title: '首页' }
-      },
-    ],
-  },
-  html: {},
-}
-```
-
-然后在 html 模板里可以通过 `htmlWebpackPlugin.options` 使用通过 `context` 指定的配置项，
-
-```html
-<title><%= htmlWebpackPlugin.options.title %></title>
-```
-
-### htmlName [暂建议默认]
-
-指定 import 生成的 html 文件的文件名。
-
-- Type: `String`
-- Default: `[name].[ext]`
-
-可以用 `[name]`、`[path]`、`[hash]` 和 `[ext]`，详见 https://github.com/webpack-contrib/file-loader 。
-
-### splitChunks [暂建议默认]
-
-配置 webpack 的 splitChunks，用于提取 common 或 vendors 等。
-
-- Type: `Boolean | Object`
-- Default: false
-
-如果值为 `true`，等于配置了 `{ chunks: 'all', name: 'vendors', minChunks: 2 }`，并且 html 的 chunks 会配置为 `["vendors", "<%= page %>"]`，详见 https://webpack.js.org/plugins/split-chunks-plugin/ 。
-
-比如只要包含 node_modules 下的公共部分，可以这样配：
-
-```js
-{
-  splitChunks: {
-    cacheGroups: {
-      vendors: {
-        chunks: 'all',
-        minChunks: 2,
-        name: 'vendors',
-        test: /[\\/]node_modules[\\/]/,
-      },
-    },
-  },
-  html: {
-    chunks: ['vendors', '<%= page %>'],
-  },
-}
-```
-
-### selectEntry [暂建议默认]
-
-是否开启 entry 选择，以提升开发效率。
-
-- Type: `Boolean | Object`
-- Default: `false`
 
 注：
 

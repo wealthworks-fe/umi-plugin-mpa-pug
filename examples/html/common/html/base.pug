@@ -1,0 +1,27 @@
+doctype html
+html(lang='zh-cmn-Hans')
+  head
+    meta(charset='utf-8')
+    meta(http-equiv='Content-Type', content='text/html; charset=UTF-8')
+    meta(http-equiv='X-UA-Compatible', content='ie=edge')
+    meta(http-equiv='Cache-Control', content='no-siteapp')
+    meta(name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no")
+    meta(content='理财入门知识', name='description')
+
+    block meta
+
+    block title
+
+    block preload
+
+    block css
+
+  body
+    block main
+      div(id='app')
+        include ./loading.pug
+
+    block static
+      script(src='https://res.wx.qq.com/open/js/jweixin-1.2.0.js')
+
+    block js
