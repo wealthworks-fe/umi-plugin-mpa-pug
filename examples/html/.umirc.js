@@ -6,7 +6,7 @@ export default {
     ['../../dist/index', {
       prefixPath:'m/',
       commonChunks:{
-        'common/base': path.resolve(__dirname,'./common/base.js')
+        'm/common/base': path.resolve(__dirname,'./common/base.js')
       },
       px2rem:{
         rootValue:16

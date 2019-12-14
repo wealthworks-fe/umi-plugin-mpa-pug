@@ -348,6 +348,21 @@ ${errors.join('\n')}
         name: '[name].html',
       });
 
+    // https://github.com/umijs/umi/blob/659f6314d4b3a5942664a44f10bb6c85c3824fb4/packages/af-webpack/src/getWebpackConfig/index.js#L111
+    // 静态资源在非根目录或 cdn
+    // 由于 umi 中，处理图片、字体、音频等资源都放到 /static 目录下
+    // 因为目前项目 nginx 代理的时候，把 /mobile/ 开头的请求 => 代理到前端web服务
+    // 而图片资源却是类似 /staitc/logo.png ，不是 mobile 开头的请求，导致找不到图片
+    // 后面研究加 base 或者 publicPath 是否可以解决
+    if (options.prefixPath) {
+      webpackConfig.module
+        .rule('exclude')
+        .use('url-loader')
+        .tap(oldOptions => {
+          return { ...oldOptions, outputPath: options.prefixPath };
+        });
+    }
+
     const { config } = api;
     if (!config.hash) {
       webpackConfig.output.chunkFilename(`[name].js`);
