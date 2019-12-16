@@ -1,4 +1,4 @@
-import FastClick from 'fastclick';
+var FastClick = require('fastclick');
 
 global.FastClick = FastClick;
 

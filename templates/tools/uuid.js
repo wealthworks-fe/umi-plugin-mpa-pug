@@ -1,27 +1,25 @@
-import generateId from 'uuid/v4';
-import Cookies from 'universal-cookie';
+var generateId = require('uuid/v4');
+var Cookies = require('universal-cookie');
 
-const cookie = new Cookies();
+var cookie = new Cookies();
 
 // 获取标识
-const getId = () => {
+function getId() {
   return cookie.get('uuid') || localStorage.getItem('uuid') || generateId();
-};
+}
 
 // 注入标识
-const injectId = uuid => {
+function injectId(uuid) {
   cookie.set('uuid', uuid, { path: '/', maxAge: 10 * 365 * 24 * 60 * 60 });
   localStorage.setItem('uuid', uuid);
-};
+}
 
-const autoInject = () => {
-  const uuid = getId();
+function autoInject() {
+  var uuid = getId();
   injectId(uuid);
-};
+}
 
-const UUID = {
+module.exports = {
   init: autoInject,
   getId: getId,
 };
-
-export default UUID;

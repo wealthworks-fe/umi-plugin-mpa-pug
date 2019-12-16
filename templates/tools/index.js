@@ -1,6 +1,5 @@
-import './eruda';
-import './fastclick';
-import UUID from './uuid';
-UUID.init();
+require('./eruda');
+require('./fastclick');
+require('./uuid').init();
 
 console.log('[INFO]：init tools success~~');

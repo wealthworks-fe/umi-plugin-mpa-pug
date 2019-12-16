@@ -98,7 +98,7 @@ function getEntrys(
 }
 
 export default function(api: IApi, options = {} as IOption) {
-  const { log, paths } = api;
+  let { log, paths } = api;
 
   // 如果 umi 升级到3.x，需要来校验一下，看是否兼容
   const umiVersion = process.env.UMI_VERSION;
