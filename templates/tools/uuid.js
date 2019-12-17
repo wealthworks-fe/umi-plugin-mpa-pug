@@ -1,5 +1,5 @@
 var generateId = require('uuid/v4');
-var Cookies = require('universal-cookie');
+var Cookies = require('universal-cookie').default;
 
 var cookie = new Cookies();
 

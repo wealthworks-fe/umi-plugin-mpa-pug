@@ -183,6 +183,7 @@ ${errors.join('\n')}
       /\.(j|t)sx$/,
       options.prefixPath,
     );
+
     const toolsEntry = {
       [`${options.prefixPath}tools`]: require.resolve(
         '../templates/tools/index.js',
