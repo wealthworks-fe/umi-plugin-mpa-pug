@@ -7,7 +7,9 @@ function injectEruda() {
 
 window.lcgcDebugModeCount = 0;
 window.lcgcDebugClickTime = Date.parse(new Date());
-var isDebugMode = !!localStorage.getItem('lcgcDebugMode');
+var isDebugMode =
+  !!localStorage.getItem('lcgcDebugMode') ||
+  window.location.search.indexOf('__debug=1') !== -1;
 if (isDebugMode) {
   injectEruda();
 }
