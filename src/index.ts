@@ -118,7 +118,6 @@ export default function(api: IApi, options = {} as IOption) {
     throw new Error(
       `
 Invalid options applied to umi-plugin-mpa-pug
-
 ${errors.join('\n')}
 `.trim(),
     );
@@ -380,6 +379,7 @@ ${errors.join('\n')}
                   name: `${options.prefixPath}vendors`,
                   chunks: 'all',
                 },
+                default: false,
               },
             },
       );
