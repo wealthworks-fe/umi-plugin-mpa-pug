@@ -1,0 +1,12 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.normal {
+  background: #e8f279;
+}
+
+.normal img {
+  width: 100%;
+}

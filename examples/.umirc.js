@@ -1,15 +1,14 @@
 import path from 'path';
 
 export default {
-  targets: {
-    android: 4,
-    ios: 8,
-    ie: 9,
+  alias: {
+    '@package': path.resolve(__dirname, 'package'),
   },
   plugins: [
     [
-      '../../dist/index',
+      '../dist/index',
       {
+        selectEntry: true,
         prefixPath: 'm/',
         commonChunks: {
           'm/common/base': path.resolve(__dirname, './common/base.js'),

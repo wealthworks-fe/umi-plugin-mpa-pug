@@ -19,8 +19,6 @@ interface IOption {
   // 页面前缀 www.xxx.com/{prefixPath}/index.html , 作用：微前端，方便项目做 nginx 代理
   // 比如：/m/ 开头的代理 指定前端项目中
   prefixPath?: string;
-  fastclick?: boolean; //暂未使用该变量，统一加入
-  debugTool?: boolean; //暂未使用该变量，统一加入
   deepPageEntry?: boolean;
   splitChunks?: object | boolean;
   injectCheck?: Function; // html 和 js 的匹配规则
@@ -44,14 +42,30 @@ interface IEntry {
 const DEFAULT_OPTIONS: IOption = {
   pagesPath: '',
   prefixPath: '',
-  debugTool: true,
-  fastclick: true,
   deepPageEntry: true,
   splitChunks: true,
   px2rem: {
     rootValue: 16,
   },
   injectCheck: (html, js) => html === js, // 默认js会注入到同一目录下，同名的 pug/html 文件内
+};
+
+// .umirc 的默认配置
+// 避免项目忘记配置，导致兼容性问题
+const DEFAULT_UMI_CONFIG = {
+  hash: true, // 生成的文件名加上 hash
+  disableCSSModules: true, // 不使用 CSS Module 否则需要改代码
+  treeShaking: true,
+  targets: {
+    browsers: [
+      'last 2 versions',
+      'Firefox ESR',
+      '> 1%',
+      'ie >= 9',
+      'iOS >= 8',
+      'Android >= 4',
+    ],
+  },
 };
 
 function getFiles(basePath: string, path: string, files: string[]) {
@@ -108,7 +122,6 @@ export default function(api: IApi, options = {} as IOption) {
   );
 
   // validate options with ajv
-  // TODO:需要对所有属性进行校验，目前允许附加的属性
   const ajv = new AJV({ allErrors: true });
   const isValid = ajv.validate(schema, options);
   if (!isValid) {
@@ -155,6 +168,11 @@ ${errors.join('\n')}
     return { ...memo, routes: [] };
   });
 
+  // 修改 umi 默认配置
+  api.modifyDefaultConfig(memo => {
+    return { ...DEFAULT_UMI_CONFIG, ...memo };
+  });
+
   api.modifyWebpackConfig(webpackConfig => {
     // set entry
     const hmrScript = webpackConfig.entry['umi'][0];
@@ -183,20 +201,6 @@ ${errors.join('\n')}
       options.prefixPath,
     );
 
-    const toolsEntry = {
-      [`${options.prefixPath}tools`]: require.resolve(
-        '../templates/tools/index.js',
-      ),
-    };
-
-    // 注入工具包
-    jsxEntrys = { ...toolsEntry, ...jsxEntrys };
-
-    // 打包公共模块
-    if (options.commonChunks) {
-      jsxEntrys = { ...options.commonChunks, ...jsxEntrys };
-    }
-
     // 如果未设置 entry，则自动匹配 pages 下的js 文件
     if (!options.entry) {
       log.info(
@@ -207,10 +211,15 @@ ${errors.join('\n')}
       webpackConfig.entry = options.entry as IEntry;
     }
 
-    // 支持选择部分 entry 以提升开发效率
+    // 支持选择部分  htmlEntry 以提升开发效率
     if (isDev && options.selectEntry) {
-      const keys = Object.keys(webpackConfig.entry);
+      log.warn(
+        `[注意，注意，注意] 如需 Ctrl+C 退出，请先选择完入口在退出，否则会造成 Node 进程无法自动关闭，占用内存!!`,
+      );
+      const keys = Object.keys(htmlEntrys);
       if (keys.length > 1) {
+        // 在选择部分页面的时候，Ctrl+C 关闭控制台，node 进程不会被关闭
+        // 选择完页面后，再 Ctrl+C 退出，则不会有问题
         const selectedKeys = deasyncPromise(
           inquirer.prompt([
             Object.assign(
@@ -230,13 +239,29 @@ ${errors.join('\n')}
             ),
           ]),
         );
-        keys.forEach(key => {
+        Object.keys(webpackConfig.entry).forEach(key => {
           if (!selectedKeys.pages.includes(key)) {
             delete webpackConfig.entry[key];
           }
         });
+        Object.keys(htmlEntrys).forEach(key => {
+          if (!selectedKeys.pages.includes(key)) {
+            delete htmlEntrys[key];
+          }
+        });
       }
     }
+
+    // 注入工具包(uuid,debug,fastclick), 注入公共模块
+    let otherEntrys: any = {
+      [`${options.prefixPath}tools`]: require.resolve(
+        '../templates/tools/index.js',
+      ),
+    };
+    if (options.commonChunks) {
+      otherEntrys = { ...otherEntrys, ...options.commonChunks };
+    }
+    webpackConfig.entry = { ...otherEntrys, ...webpackConfig.entry };
 
     // 遍历 entry 增加热更新模块
     Object.keys(webpackConfig.entry).forEach(key => {
@@ -293,7 +318,7 @@ ${errors.join('\n')}
     // 开发环境，如果没有找到 index.html ，则展示 __index.html(页面列表清单) 当首页
     if (isDev) {
       let filename = 'index.html';
-      if (Object.keys(webpackConfig.entry).includes('index')) {
+      if (Object.keys(htmlEntrys).includes('index')) {
         filename = '__index.html';
         const port = process.env.PORT || '8000';
         log.warn(
