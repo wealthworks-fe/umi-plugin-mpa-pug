@@ -1,6 +1,6 @@
 {
   "name": "umi-plugin-mpa-pug",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "MPA(multiple-page application) plugin for umi.",
   "repository": "wealthworks-fe/umi-plugin-mpa-pug",
   "main": "dist/index.js",
