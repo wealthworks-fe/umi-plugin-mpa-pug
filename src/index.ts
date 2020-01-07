@@ -12,6 +12,10 @@ const assert = require('assert');
 const deasyncPromise = require('deasync-promise');
 // 用户与命令行交互的工具
 const inquirer = require('inquirer');
+inquirer.registerPrompt(
+  'checkbox-plus',
+  require('inquirer-checkbox-plus-prompt'),
+);
 // semver版本号判断
 const semver = require('semver');
 
@@ -224,14 +228,24 @@ ${errors.join('\n')}
           inquirer.prompt([
             Object.assign(
               {
-                type: 'checkbox',
-                message: 'Please select your entry pages',
+                type: 'checkbox-plus',
+                message: 'Please select your entry pages [support filter]：',
                 name: 'pages',
+                highlight: true,
+                searchable: true,
                 choices: keys.map(v => ({
                   name: v,
                 })),
                 validate: v => {
                   return v.length >= 1 || 'Please choose at least one';
+                },
+                source: function(answersSoFar, input) {
+                  return new Promise(resolve => {
+                    let currentEntry = keys.filter(
+                      item => item.toLowerCase().indexOf(input || '') !== -1,
+                    );
+                    resolve(currentEntry);
+                  });
                 },
                 pageSize: 18,
               },
@@ -239,6 +253,7 @@ ${errors.join('\n')}
             ),
           ]),
         );
+
         Object.keys(webpackConfig.entry).forEach(key => {
           if (!selectedKeys.pages.includes(key)) {
             delete webpackConfig.entry[key];
