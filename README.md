@@ -1,5 +1,7 @@
 # umi-plugin-mpa-pug
 
+> 注意：该插件目前是基于 umi2 版本上进行开发的，如果使用 umi3 需要测试是否可用。
+
 该插件 Fork [umi-plugin-mpa](https://github.com/umijs/umi-plugin-mpa) 仓库，做了一下几点的修改，以便无缝迁移项目用。
 
 [![NPM version](https://img.shields.io/npm/v/umi-plugin-mpa-pug.svg?style=flat)](https://npmjs.org/package/umi-plugin-mpa-pug)
