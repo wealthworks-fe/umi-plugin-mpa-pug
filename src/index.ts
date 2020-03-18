@@ -1,4 +1,4 @@
-import { IApi } from 'umi-plugin-types';
+import { IApi } from 'umi';
 import { readdirSync, lstatSync } from 'fs';
 import { join, extname, basename } from 'path';
 import { cloneDeep, isPlainObject, flattenDeep } from 'lodash';
@@ -115,14 +115,39 @@ function getEntrys(
     }, {});
 }
 
-export default function(api: IApi, options = {} as IOption) {
-  let { log, paths } = api;
+export default function(api: IApi) {
+  let { logger, paths } = api;
+
+  // 必须对插件插件参数进行校验，否则无法获取参数，会报 Validate config "mpaPug" failed
+  api.describe({
+    key: 'mpaPug',
+    config: {
+      default: DEFAULT_OPTIONS,
+      schema(joi) {
+        return joi.object({
+          entry: joi.object(),
+          pagesPath: joi.string(),
+          prefixPath: joi.string(),
+          deepPageEntry: joi.boolean(),
+          splitChunks: joi.boolean(),
+          px2rem: joi.object(),
+          injectCheck: joi.function(),
+          selectEntry: joi.boolean(),
+          commonChunks: joi.object(),
+          html: joi.object(),
+        });
+      },
+    },
+  });
+
+  let options = api.service.userConfig.mpaPug || {};
 
   // 如果 umi 升级到3.x，需要来校验一下，看是否兼容
   const umiVersion = process.env.UMI_VERSION;
+
   assert(
-    semver.gte(umiVersion, '2.4.3') && semver.lt(umiVersion, '3.0.0'),
-    `Your umi version is ${umiVersion}, >=2.4.3 and <3 is required.`,
+    semver.gte(umiVersion, '3.0.0') && semver.lt(umiVersion, '4.0.0'),
+    `Your umi version is ${umiVersion}, >=3.0.0 and <4.0.0 is required.`,
   );
 
   // validate options with ajv
@@ -141,7 +166,7 @@ ${errors.join('\n')}
   }
 
   if (!process.env.DISABLE_WARN) {
-    log.warn(
+    logger.warn(
       `
   [umi-plugin-mpa-pug] 使用 mpa 插件，意味着我们只使用 umi 作为构建工具。所以：
 
@@ -166,18 +191,20 @@ ${errors.join('\n')}
 
   options = { ...DEFAULT_OPTIONS, ...options };
 
+  // 修改 umi 默认配置
   // 提供一个假的 routes 配置，这样就不会走约定式路由，解析 src/pages 目录
   // https://umijs.org/zh/config/#routes
-  api.modifyDefaultConfig(memo => {
+  api.modifyDefaultConfig((memo: any) => {
     return { ...memo, routes: [] };
   });
 
   // 修改 umi 默认配置
-  api.modifyDefaultConfig(memo => {
+  api.modifyDefaultConfig((memo: any) => {
     return { ...DEFAULT_UMI_CONFIG, ...memo };
   });
 
-  api.modifyWebpackConfig(webpackConfig => {
+  // 遍历文件找到页面入口，注入到 webpack 中
+  api.modifyBundleConfig(webpackConfig => {
     // set entry
     const hmrScript = webpackConfig.entry['umi'][0];
 
@@ -207,7 +234,7 @@ ${errors.join('\n')}
 
     // 如果未设置 entry，则自动匹配 pages 下的js 文件
     if (!options.entry) {
-      log.info(
+      logger.info(
         `[umi-plugin-mpa-pug] options.entry is null, find files in ${pagesPath} for entry`,
       );
       webpackConfig.entry = jsxEntrys;
@@ -217,7 +244,7 @@ ${errors.join('\n')}
 
     // 支持选择部分  htmlEntry 以提升开发效率
     if (isDev && options.selectEntry) {
-      log.warn(
+      logger.warn(
         `[注意，注意，注意] 如需 Ctrl+C 退出，请先选择完入口在退出，否则会造成 Node 进程无法自动关闭，占用内存!!`,
       );
       const keys = Object.keys(htmlEntrys);
@@ -336,7 +363,7 @@ ${errors.join('\n')}
       if (Object.keys(htmlEntrys).includes('index')) {
         filename = '__index.html';
         const port = process.env.PORT || '8000';
-        log.warn(
+        logger.warn(
           `Since we already have index.html, checkout http://localhost:${port}/${filename} for entry list.`,
         );
       }
@@ -367,7 +394,8 @@ ${errors.join('\n')}
     return webpackConfig;
   });
 
-  api.chainWebpackConfig(webpackConfig => {
+  // 添加 html-loader 和 pug-loader
+  api.chainWebpack(webpackConfig => {
     webpackConfig.module
       .rule('html')
       .test(/\.html?$/)
@@ -392,19 +420,32 @@ ${errors.join('\n')}
     // 静态资源在非根目录或 cdn
     // 由于 umi 中，处理图片、字体、音频等资源都放到 /static 目录下
     // 因为目前项目 nginx 代理的时候，把 /mobile/ 开头的请求 => 代理到前端web服务
-    // 而图片资源却是类似 /staitc/logo.png ，不是 mobile 开头的请求，导致找不到图片
+    // 而图片资源却是类似 /staitc/loggero.png ，不是 mobile 开头的请求，导致找不到图片
     // 后面研究加 base 或者 publicPath 是否可以解决
     if (options.prefixPath) {
       webpackConfig.module
-        .rule('exclude')
+        .rule('images')
         .use('url-loader')
+        .tap(oldOptions => {
+          return { ...oldOptions, outputPath: options.prefixPath };
+        });
+
+      webpackConfig.module
+        .rule('svg')
+        .use('file-loader')
+        .tap(oldOptions => {
+          return { ...oldOptions, outputPath: options.prefixPath };
+        });
+
+      webpackConfig.module
+        .rule('fonts')
+        .use('file-loader')
         .tap(oldOptions => {
           return { ...oldOptions, outputPath: options.prefixPath };
         });
     }
 
-    const { config } = api;
-    if (!config.hash) {
+    if (!api.config.hash) {
       webpackConfig.output.chunkFilename(`[name].js`);
     }
 
@@ -424,9 +465,12 @@ ${errors.join('\n')}
             },
       );
     }
+
+    return webpackConfig;
   });
 
-  api.modifyAFWebpackOpts(opts => {
+  // 添加 rem，添加 urlloader
+  api.modifyBundleConfigOpts(opts => {
     opts.urlLoaderExcludes = [
       ...(opts.urlLoaderExcludes || []),
       /\.html?$/,
